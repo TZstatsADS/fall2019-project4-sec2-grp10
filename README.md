@@ -13,7 +13,7 @@ Term: Fall 2019
 	+ Yanyan Liu
 	+ Mo Yang
 + Project summary: Matrix factorization is a common machine learning technique for recommender systems, like books for Amazon or movies for Netflix. 
-![](https://github.com/TZstatsADS/fall2019-proj3-sec2--grp7/blob/master/figs/Round1.png)
+![](https://github.com/TZstatsADS/fall2019-project4-sec2-grp10/blob/master/figs/img1.png)
 The idea of these methods is to approximate the user-movie rating matrix R as a product of two low-rank matrices U and V such that R ≈ U × V . In this way U and V are constructed from the known ratings in R, which is usually very sparsely filled. The recommendations can be made from the approximation U × V which is dense. If M × N is the dimension of R then U and V will have dimensions M × K and N × K. Noise is added to the model to avoid overfitting.
 	
 **Contribution statement**: [default] All team members contributed equally in all stages of this project. All team members approve our work presented in this GitHub repository including this contributions statement. 
