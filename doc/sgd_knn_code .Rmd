@@ -1,14 +1,18 @@
 ---
-title: "Project4"
+title: "Project4 group10"
 output:
   html_document:
     df_print: paged
   pdf_document: default
 ---
 
+### Introduction
+In this project, our group worked on the comparison between two algorithms for collaborative filtering, which are Stochastic Gradient Descent and Gradient Descent with Probabilistic Assumptions, with KNN post-processing procedure. The data we used in this project contains 100836 pieces of ratings for movies from Netflix. For each algorithm, we did matrix factrization, parameter tuning, cross validation and post-processing, and we used rmse for comparison of the results. 
+
+## Stochastic Gradient Descent 
 
 ### Step 1 Load Data and Train-test Split
-```{r}
+```{r  message=FALSE }
 library(dplyr)
 library(tidyr)
 library(ggplot2)
@@ -20,7 +24,10 @@ data_train <- data[train_idx,]
 data_test <- data[test_idx,]
 ```
 
+
+
 ###Step 2 Matrix Factorization
+
 #### Step 2.1 Algorithm and Regularization
 Here we perform stochastic gradien descent to do matrix factorization.
 
@@ -62,6 +69,10 @@ rmse$epoch <- as.numeric(gsub("X", "", rmse$epoch))
 rmse %>% ggplot(aes(x = epoch, y = RMSE, col = train_test)) + geom_point() + facet_grid(~par)
 ```
 
+
+From the graph above, we can see that when f=10 and lambda=0.01, we get the smallest rmse. So we choose these values for f and lambda. 
+
+
 ### Step 3 Postprocessing
 After matrix factorization, postporcessing will be performed to improve accuracy.
 Here we use KNN.
@@ -74,7 +85,7 @@ save(result, file = "../output/mat_fac.RData")
 ```
 
 
-```{r}
+```{r message=FALSE}
 load("../output/mat_fac.RData")
 
 #result[["q"]][,i] #ith movie features值
@@ -90,13 +101,8 @@ for (i in 1:ncol(result[["q"]])){
   closest[i] <- which(grepl(max(x[-which.max(x)]),x))# return the second highest cosine sim(drop itself)
 }
 #closest
-meanrate<-data%>%group_by(movieId)%>%summarize(mean_rating=mean(rating))
-knn_rating <- vector()
-for (m in 1:9724) {
-  knn_rating[m] <- meanrate[closest[m], 2]
-}
-knn_rating<-unlist(knn_rating)
-#knn_rating
+
+
 ```
 ```{r}
 # calculate the rate for different movies
@@ -105,9 +111,11 @@ meanrate<-data%>%group_by(movieId)%>%summarize(mean_rating=mean(rating))
 median_rate<-data%>%group_by(movieId)%>%summarize(median_rating=median(rating))
 ```
 
-Linear regression
+### Linear regression
 
-```{r}
+After getting the results of matrix factorization and KNN, we used linear regression for prediction of the final result. The equation is $\hat{r_{ij}}$= $\beta_0$+$\beta_1$$p_{i}^t$$q_j$+$\beta_2$$KNN_j$.
+
+```{r message=FALSE}
 library(tidyverse)
 DAT<-data
 DAT<-DAT[,-4]
@@ -119,9 +127,9 @@ DAT1$userId <-rep(1:610, times = 9724)
 
 
 #add X2
-knn_rating <- vector()
+knn_rating <- c()
 for (m in 1:9724) {
-   knn_rating[m] <- median_rate[closest[m], 2]
+   knn_rating[m] <- meanrate[closest[m], 2]
 }
 knn_rating<-unlist(knn_rating)
 DAT1$KNN<- rep(knn_rating, times =610)
@@ -132,7 +140,7 @@ DAT1$KNN<- rep(knn_rating, times =610)
 q <- as.matrix(result[["q"]])
  p <- as.matrix(result[["p"]])
 r<-t(p)%*%q
-dim(r)
+#dim(r)
 x1<-as.vector(r)
 
 DAT1$X1<-x1
@@ -149,11 +157,14 @@ reg<-lm(y~KNN+X1,data=DAT2)
 summary(reg)
 ```
 
+The result of linear regression showed that KNN is not significant since its p-value is large. We decided not to include KNN part in our final linear model. 
 
 
 ### Step 4 Evaluation
 
-```{r}
+Here we visualize training and testing RMSE by different dimension of factors and epochs. We will compare the result with the Gradient Descent with Probabilistic Assumptions algorithm later. 
+
+```{r warning=FALSE}
 library(ggplot2)
 
 RMSE <- data.frame(epochs = seq(20, 100, 20), Training_MSE = result$train_RMSE, Test_MSE = result$test_RMSE) %>% gather(key = train_or_test, value = RMSE, -epochs)
@@ -161,3 +172,5 @@ RMSE <- data.frame(epochs = seq(20, 100, 20), Training_MSE = result$train_RMSE, 
 RMSE %>% ggplot(aes(x = epochs, y = RMSE,col = train_or_test)) + geom_point() + scale_x_discrete(limits = seq(20, 100, 20)) + xlim(c(0, 100))
 
 ```
+
+
