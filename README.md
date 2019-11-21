@@ -18,11 +18,11 @@ Term: Fall 2019
 
 Stochastic Gradient Descent 
 
-![](https://github.com/TZstatsADS/fall2019-project4-sec2-grp10/blob/master/figs/Stochastic Gradient Descent.png)
+![](https://github.com/TZstatsADS/fall2019-project4-sec2-grp10/blob/master/figs/Stochastic.png)
 
 Gradient Descent with Probabilistic Assumptions
 
-![](https://github.com/TZstatsADS/fall2019-project4-sec2-grp10/blob/master/figs/Gradient Descent with Probabilistic Assumptions.png)
+![](https://github.com/TZstatsADS/fall2019-project4-sec2-grp10/blob/master/figs/Assumptions.png)
 
 + Then we use KNN. K=1 to find the nearest movie for each movie, and calculate the mean score of k features. After that, we built linear regression to optimize the rating accuracy and calculated the final prediction of the rating. 
 
