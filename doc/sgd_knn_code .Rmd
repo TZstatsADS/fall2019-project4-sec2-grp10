@@ -1,0 +1,176 @@
+---
+title: "Project4 group10"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+### Introduction
+In this project, our group worked on the comparison between two algorithms for collaborative filtering, which are Stochastic Gradient Descent and Gradient Descent with Probabilistic Assumptions, with KNN post-processing procedure. The data we used in this project contains 100836 pieces of ratings for movies from Netflix. For each algorithm, we did matrix factrization, parameter tuning, cross validation and post-processing, and we used rmse for comparison of the results. 
+
+## Stochastic Gradient Descent 
+
+### Step 1 Load Data and Train-test Split
+```{r  message=FALSE }
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+data <- read.csv("../data/ml-latest-small/ratings.csv")
+set.seed(0)
+test_idx <- sample(1:nrow(data), round(nrow(data)/5, 0))
+train_idx <- setdiff(1:nrow(data), test_idx)
+data_train <- data[train_idx,]
+data_test <- data[test_idx,]
+```
+
+
+
+###Step 2 Matrix Factorization
+
+#### Step 2.1 Algorithm and Regularization
+Here we perform stochastic gradien descent to do matrix factorization.
+
+
+```{r}
+U <- length(unique(data$userId))
+I <- length(unique(data$movieId))
+source("../lib/Matrix_Factorization.R")
+```
+
+
+#### Step 2.2 Parameter Tuning
+
+```{r}
+source("../lib/cross_validation.R")
+f_list <- seq(10, 20, 10)
+l_list <- seq(-2, -1, 1)
+f_l <- expand.grid(f_list, l_list)
+```
+
+```{r, eval=FALSE}
+result_summary <- array(NA, dim = c(nrow(f_l), 10, 4)) 
+run_time <- system.time(for(i in 1:nrow(f_l)){
+    par <- paste("f = ", f_l[i,1], ", lambda = ", 10^f_l[i,2])
+    cat(par, "\n")
+    current_result <- cv.function(data, K = 5, f = f_l[i,1], lambda = 10^f_l[i,2])
+    result_summary[,,i] <- matrix(unlist(current_result), ncol = 10, byrow = T) 
+    print(result_summary)
+  
+})
+
+save(result_summary, file = "../output/rmse.Rdata")
+```
+
+```{r}
+load("../output/rmse.Rdata")
+rmse <- data.frame(rbind(t(result_summary[1,,]), t(result_summary[2,,])), train_test = rep(c("Train", "Test"), each = 4), par = rep(paste("f = ", f_l[,1], ", lambda = ", 10^f_l[,2]), times = 2)) %>% gather("epoch", "RMSE", -train_test, -par)
+rmse$epoch <- as.numeric(gsub("X", "", rmse$epoch))
+rmse %>% ggplot(aes(x = epoch, y = RMSE, col = train_test)) + geom_point() + facet_grid(~par)
+```
+
+
+From the graph above, we can see that when f=10 and lambda=0.01, we get the smallest rmse. So we choose these values for f and lambda. 
+
+
+### Step 3 Postprocessing
+After matrix factorization, postporcessing will be performed to improve accuracy.
+Here we use KNN.
+
+```{r, eval= FALSE}
+result <- gradesc(f = 10, lambda = 0.1,lrate = 0.01, max.iter = 100, stopping.deriv = 0.01,
+                   data = data, train = data_train, test = data_test)
+
+save(result, file = "../output/mat_fac.RData")
+```
+
+
+```{r message=FALSE}
+load("../output/mat_fac.RData")
+
+#result[["q"]][,i] #ith movie features值
+library(lsa)
+
+cossim_mat <- cosine(as.matrix(result[["q"]]))
+save(cossim_mat, file = "../output/cossim.Rdata")
+closest <- rep(NA, ncol(result[["q"]]))
+
+for (i in 1:ncol(result[["q"]])){
+  x<- cossim_mat[i,]
+  x<-t(x)
+  closest[i] <- which(grepl(max(x[-which.max(x)]),x))# return the second highest cosine sim(drop itself)
+}
+#closest
+
+
+```
+```{r}
+# calculate the rate for different movies
+meanrate<-data%>%group_by(movieId)%>%summarize(mean_rating=mean(rating))
+# MEDIA
+median_rate<-data%>%group_by(movieId)%>%summarize(median_rating=median(rating))
+```
+
+### Linear regression
+
+After getting the results of matrix factorization and KNN, we used linear regression for prediction of the final result. The equation is $\hat{r_{ij}}$= $\beta_0$+$\beta_1$$p_{i}^t$$q_j$+$\beta_2$$KNN_j$.
+
+```{r message=FALSE}
+library(tidyverse)
+DAT<-data
+DAT<-DAT[,-4]
+DAT <- DAT %>% spread(movieId, rating)
+DAT1 <- data.frame(index=seq(1:5931640))
+DAT1$y <-as.vector(as.matrix(DAT[,-1]))
+DAT1$movieId<-rep(1:9724, times = 610)
+DAT1$userId <-rep(1:610, times = 9724)
+
+
+#add X2
+knn_rating <- c()
+for (m in 1:9724) {
+   knn_rating[m] <- meanrate[closest[m], 2]
+}
+knn_rating<-unlist(knn_rating)
+DAT1$KNN<- rep(knn_rating, times =610)
+
+
+
+# prepare x1 predictor
+q <- as.matrix(result[["q"]])
+ p <- as.matrix(result[["p"]])
+r<-t(p)%*%q
+#dim(r)
+x1<-as.vector(r)
+
+DAT1$X1<-x1
+
+# remove NA
+
+DAT2<-na.omit(DAT1)
+DAT2<-DAT2[,-1]
+DAT2
+
+# regression model
+
+reg<-lm(y~KNN+X1,data=DAT2)
+summary(reg)
+```
+
+The result of linear regression showed that KNN is not significant since its p-value is large. We decided not to include KNN part in our final linear model. 
+
+
+### Step 4 Evaluation
+
+Here we visualize training and testing RMSE by different dimension of factors and epochs. We will compare the result with the Gradient Descent with Probabilistic Assumptions algorithm later. 
+
+```{r warning=FALSE}
+library(ggplot2)
+
+RMSE <- data.frame(epochs = seq(20, 100, 20), Training_MSE = result$train_RMSE, Test_MSE = result$test_RMSE) %>% gather(key = train_or_test, value = RMSE, -epochs)
+
+RMSE %>% ggplot(aes(x = epochs, y = RMSE,col = train_or_test)) + geom_point() + scale_x_discrete(limits = seq(20, 100, 20)) + xlim(c(0, 100))
+
+```
+
+
