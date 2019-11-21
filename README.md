@@ -27,7 +27,12 @@ p.s. To implement GDP, we need to firstly do probabilistic matrix factorization.
  
 with partial differential
  
- 
+We tuned the parameters and then we compared the RMSEs to find our best model for each algorithm. We Compared the results of the plots. We found the lowest RMSE of testing data is f=10, and lambda =0.1. we found the pattern of the points follow the gradually descended.
+
+Then we use KNN. K=1 to find the nearest movie for each movie, and calculate the mean score of k features. After that, we built linear regression to optimize the rating accuracy and calculated the final prediction of the rating. 
+
+Last, we got the conclusion, it will take more time, even though the RMSE will get better, and result of this two models are similar, after the postprocessing with KNN, model does not have a significant impact on the accuracy.
+
 
 **Contribution statement**: [default] All team members contributed equally in all stages of this project. All team members approve our work presented in this GitHub repository including this contributions statement. 
 
