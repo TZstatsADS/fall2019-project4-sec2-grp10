@@ -16,11 +16,11 @@ Term: Fall 2019
 
 + We tuned the parameters and then we compared the RMSEs to find our best model for each algorithm. We Compared the results of the plots. We found the lowest RMSE of testing data is f=10, and lambda =0.1. we found the pattern of the points follow the gradually descended.
 
-Stochastic Gradient Descent 
+Stochastic Gradient Descent (f = 10, lambda =0.1)
 
 ![](https://github.com/TZstatsADS/fall2019-project4-sec2-grp10/blob/master/figs/Stochastic.png)
 
-Gradient Descent with Probabilistic Assumptions
+Gradient Descent with Probabilistic Assumptions (f = 20, sigma_p =sigma_q = 0.5)
 
 ![](https://github.com/TZstatsADS/fall2019-project4-sec2-grp10/blob/master/figs/Assumptions.png)
 
@@ -37,10 +37,10 @@ GDP(Gradient Descent with Probabilistic Assumptions)
 
 The idea of these methods is to approximate the user-movie rating matrix R as a product of two low-rank matrices U and V such that R ≈ U × V. In this way U and V are constructed from the known ratings in R, which is usually very sparsely filled. The recommendations can be made from the approximation U × V which is dense. If M × N is the dimension of R then U and V will have dimensions M × F and N × F.
 
+[](https://github.com/TZstatsADS/fall2019-project4-sec2-grp10/blob/master/figs/Gradient.png)
+
 p.s. To implement GDP, we need to firstly do probabilistic matrix factorization. The Gradient Descent algorithm consists of updates in the direction that minimizes L(U, V) until convergence.
- 
- 
-with partial differential
+
  
 
 **Contribution statement**: [default] All team members contributed equally in all stages of this project. All team members approve our work presented in this GitHub repository including this contributions statement. 
