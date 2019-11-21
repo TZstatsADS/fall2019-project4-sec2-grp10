@@ -1,5 +1,5 @@
 ---
-title: "Project4-A2+KNN"
+title: "Probabilistic Gradient Descent"
 output:
   html_document:
     df_print: paged
@@ -10,7 +10,7 @@ editor_options:
 
 
 ### Step 1 Load Data and Train-test Split
-```{r}
+```{r,message=FALSE,warning=FALSE}
 library(dplyr)
 library(tidyr)
 library(MASS)
@@ -23,7 +23,8 @@ data_train <- data[train_idx,]
 data_test <- data[test_idx,]
 ```
 
-###Step 2 Matrix Factorization
+### Step 2 Matrix Factorization
+
 #### Step 2.1 Algorithm and Regularization
 
 A2. [Gradient Descent with Probabilistic Assumptions](./paper/P3 probabilistic-matrix-factorization.pdf) Section 2
@@ -44,16 +45,17 @@ RMSE <- function(rating, est_rating){
 ```
 
 
-
-
 #### Step 2.2 Parameter Tuning
 
 ```{r}
+#load PMF algorithm
 source("../lib/cross_validation_pmf.R")
+#set list of feature combination
 f_l = cbind(c(10,20,10,20),c(1,1,0.5,0.5),c(1,1,0.5,0.5))
 ```
 
 ```{r, eval=FALSE}
+#cross-validation with K = 5
 result_summary <- array(NA, dim = c(nrow(f_l), 5, 4)) 
 run_time <- system.time(for(i in 1:nrow(f_l)){
     par <- paste("f = ", f_l[i,1], ", sigma_p = ", f_l[i,2],", sigma_q = ", f_l[i,3])
@@ -66,6 +68,7 @@ save(result_summary, file = "../output/pmf/rmse_pmf.Rdata")
 ```
 
 ```{r}
+#plot the rmse result of cross-validation
 load("../output/pmf/rmse_pmf.Rdata")
 rmse_pmf <- data.frame(rbind(t(result_summary[1,,]), t(result_summary[2,,])), train_test = rep(c("Train", "Test"), each = 4), par = rep(paste("f = ", f_l[,1], ", sigma_p = ", f_l[,2], ", sigma_q = ", f_l[,3]), times = 2)) %>% gather("epoch", "RMSE", -train_test, -par)
 rmse_pmf$epoch <- as.numeric(gsub("X", "", rmse_pmf$epoch))
@@ -76,19 +79,19 @@ rmse_pmf %>% ggplot(aes(x = epoch, y = RMSE, col = train_test)) + geom_point() +
 After matrix factorization, postporcessing will be performed to improve accuracy.
 The referenced papers are:
 
-P2:[Postprocessing SVD with KNN](./paper/P2 Improving regularized singular value decomposition for collaborative filtering .pdf) Section 3.5
+P2:[Postprocessing SVD with KNN], "Improving regularized singular value decomposition for collaborative filtering", Section 3.5
 
 
 ```{r, eval= FALSE}
+#fit model with best parameters chosen from CV.
 result <- gradesc_pmf(f = 10, sigma_p = 0.5,sigma_q = 0.5, lrate = 0.01, max.iter = 100, stopping.deriv = 0.01, data = data, train = data_train, test = data_test)
 
 save(result, file = "../output/pmf/mat_fac_pmf.RData")
 ```
 
-```{r}
+```{r,message=FALSE}
 load(file = "../output/pmf/mat_fac_pmf.RData")
 
-#result[["q"]][,i] #ith movie features值
 library(lsa)
 
 cossim_mat <- cosine(as.matrix(result[["q"]]))
@@ -97,7 +100,7 @@ closest <- rep(NA, ncol(result[["q"]]))
 for (i in 1:ncol(result[["q"]])){
   x<- cossim_mat[i,]
   x<-t(x)
-  closest[i] <- which(grepl(max(x[-which.max(x)]),x))# return the second highest cosine sim(drop itself)
+  closest[i] <- which(grepl(max(x[-which.max(x)]),x))# return the second highest cosine sim (drop itself).
 }
 ```
 
@@ -108,7 +111,7 @@ meanrate <- data%>%group_by(movieId)%>%summarize(mean_rating=mean(rating))
 medianrate <- data%>%group_by(movieId)%>%summarize(median_rating=median(rating))
 ```
 
-```{r}
+```{r,message=FALSE}
 library(tidyverse)
 DAT<-data
 DAT <- DAT [,-4]
@@ -146,6 +149,8 @@ reg<-lm(y~KNN+X1,data=DAT2)
 summary(reg)
 ```
 
+According to the coefficients of fitted linear model, the knn ratings does not have a significant influence on the prediction result we get from probablistic gradient descent. Therefore we simply drop this term and keep the original P and Q for evaluation.
+
 ### Step 4 Evaluation
 
 ```{r}
@@ -156,3 +161,5 @@ RMSE <- data.frame(epochs = seq(20, 100, 20), Training_MSE = result$train_RMSE, 
 RMSE %>% ggplot(aes(x = epochs, y = RMSE,col = train_or_test)) + geom_point() + scale_x_discrete(limits = seq(20, 100, 20)) + xlim(c(0, 100))
 
 ```
+
+From the plots of RMSE's of PMF and SGD in the first part, we can see the prediction power of SGD and PMF are almost the same in this case. The possible reasons is: the two algorithms both belong to gradient descent category so they have the similar calculation flow throughout the limited number of iterations. 
