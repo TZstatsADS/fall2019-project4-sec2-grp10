@@ -1,0 +1,158 @@
+---
+title: "Project4-A2+KNN"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+editor_options: 
+  chunk_output_type: console
+---
+
+
+### Step 1 Load Data and Train-test Split
+```{r}
+library(dplyr)
+library(tidyr)
+library(MASS)
+library(ggplot2)
+data <- read.csv("../data/ml-latest-small/ratings.csv")
+set.seed(0)
+test_idx <- sample(1:nrow(data), round(nrow(data)/5, 0))
+train_idx <- setdiff(1:nrow(data), test_idx)
+data_train <- data[train_idx,]
+data_test <- data[test_idx,]
+```
+
+###Step 2 Matrix Factorization
+#### Step 2.1 Algorithm and Regularization
+
+A2. [Gradient Descent with Probabilistic Assumptions](./paper/P3 probabilistic-matrix-factorization.pdf) Section 2
+
+
+```{r}
+U <- length(unique(data$userId))
+I <- length(unique(data$movieId))
+source("../lib/Matrix_Factorization_pmf.R")
+#RMSE function
+RMSE <- function(rating, est_rating){
+  sqr_err <- function(obs){
+    sqr_error <- (obs[3] - est_rating[as.character(obs[2]), as.character(obs[1])])^2
+    return(sqr_error)
+  }
+  return(sqrt(mean(apply(rating, 1, sqr_err))))  
+}
+```
+
+
+
+
+#### Step 2.2 Parameter Tuning
+
+```{r}
+source("../lib/cross_validation_pmf.R")
+f_l = cbind(c(10,20,10,20),c(1,1,0.5,0.5),c(1,1,0.5,0.5))
+```
+
+```{r, eval=FALSE}
+result_summary <- array(NA, dim = c(nrow(f_l), 5, 4)) 
+run_time <- system.time(for(i in 1:nrow(f_l)){
+    par <- paste("f = ", f_l[i,1], ", sigma_p = ", f_l[i,2],", sigma_q = ", f_l[i,3])
+    cat(par, "\n")
+    current_result <- cv.function_pmf(data, K = 5, f = f_l[i,1],sigma_p=f_l[i,2],sigma_q= f_l[i,3],sigma = 0.1)
+    result_summary[,,i] <- matrix(unlist(current_result), ncol = 5, byrow = T) 
+    print(result_summary)
+})
+save(result_summary, file = "../output/pmf/rmse_pmf.Rdata")
+```
+
+```{r}
+load("../output/pmf/rmse_pmf.Rdata")
+rmse_pmf <- data.frame(rbind(t(result_summary[1,,]), t(result_summary[2,,])), train_test = rep(c("Train", "Test"), each = 4), par = rep(paste("f = ", f_l[,1], ", sigma_p = ", f_l[,2], ", sigma_q = ", f_l[,3]), times = 2)) %>% gather("epoch", "RMSE", -train_test, -par)
+rmse_pmf$epoch <- as.numeric(gsub("X", "", rmse_pmf$epoch))
+rmse_pmf %>% ggplot(aes(x = epoch, y = RMSE, col = train_test)) + geom_point() + facet_grid(~par)
+```
+
+### Step 3 Postprocessing
+After matrix factorization, postporcessing will be performed to improve accuracy.
+The referenced papers are:
+
+P2:[Postprocessing SVD with KNN](./paper/P2 Improving regularized singular value decomposition for collaborative filtering .pdf) Section 3.5
+
+
+```{r, eval= FALSE}
+result <- gradesc_pmf(f = 10, sigma_p = 0.5,sigma_q = 0.5, lrate = 0.01, max.iter = 100, stopping.deriv = 0.01, data = data, train = data_train, test = data_test)
+
+save(result, file = "../output/pmf/mat_fac_pmf.RData")
+```
+
+```{r}
+load(file = "../output/pmf/mat_fac_pmf.RData")
+
+#result[["q"]][,i] #ith movie features值
+library(lsa)
+
+cossim_mat <- cosine(as.matrix(result[["q"]]))
+save(cossim_mat, file = "../output/pmf/cossim.Rdata")
+closest <- rep(NA, ncol(result[["q"]]))
+for (i in 1:ncol(result[["q"]])){
+  x<- cossim_mat[i,]
+  x<-t(x)
+  closest[i] <- which(grepl(max(x[-which.max(x)]),x))# return the second highest cosine sim(drop itself)
+}
+```
+
+```{r}
+# calculate the mean rate for different movies
+meanrate <- data%>%group_by(movieId)%>%summarize(mean_rating=mean(rating))
+# median
+medianrate <- data%>%group_by(movieId)%>%summarize(median_rating=median(rating))
+```
+
+```{r}
+library(tidyverse)
+DAT<-data
+DAT <- DAT [,-4]
+DAT <- DAT %>% spread(movieId, rating)
+DAT1 <- data.frame(index=seq(1:5931640))
+DAT1$y <-as.vector(as.matrix(DAT[,-1]))
+DAT1$movieId<-rep(1:9724, times = 610)
+DAT1$userId <-rep(1:610, times = 9724)
+
+
+#add X2
+knn_rating <- c()
+for (m in 1:9724) {
+  knn_rating[m] <- meanrate[closest[m], 2]
+}
+knn_rating<-unlist(knn_rating)
+DAT1$KNN<- rep(knn_rating, times =610)
+
+# prepare x1 predictor
+q <- as.matrix(result[["q"]])
+p <- as.matrix(result[["p"]])
+r<-t(p)%*%q
+x1<-as.vector(r)
+
+DAT1$X1<-x1
+
+# remove NA
+
+DAT2<-na.omit(DAT1)
+DAT2<-DAT2[,-1]
+
+# regression model
+
+reg<-lm(y~KNN+X1,data=DAT2)
+summary(reg)
+```
+
+### Step 4 Evaluation
+
+```{r}
+library(ggplot2)
+
+RMSE <- data.frame(epochs = seq(20, 100, 20), Training_MSE = result$train_RMSE, Test_MSE = result$test_RMSE) %>% gather(key = train_or_test, value = RMSE, -epochs)
+
+RMSE %>% ggplot(aes(x = epochs, y = RMSE,col = train_or_test)) + geom_point() + scale_x_discrete(limits = seq(20, 100, 20)) + xlim(c(0, 100))
+
+```
