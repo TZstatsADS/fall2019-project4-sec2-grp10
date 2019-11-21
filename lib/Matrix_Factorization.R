@@ -47,7 +47,7 @@ gradesc <- function(f = 10,
       }
     }
     #print the values of training and testing RMSE
-    if (l %% 10 == 0){
+    if (l %% 20 == 0){
       cat("epoch:", l, "\t")
       est_rating <- t(q) %*% p
       rownames(est_rating) <- levels(as.factor(data$movieId))
